@@ -1,13 +1,15 @@
 package org.ansj.lucene5;
 
 import java.io.BufferedReader;
-import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.ansj.lucene.util.AnsjTokenizer;
+import org.ansj.splitWord.analysis.BaseAnalysis;
 import org.ansj.splitWord.analysis.DicAnalysis;
 import org.ansj.splitWord.analysis.IndexAnalysis;
 import org.ansj.splitWord.analysis.ToAnalysis;
@@ -15,8 +17,11 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.Tokenizer;
 import org.nlpcn.commons.lang.util.IOUtil;
 import org.nlpcn.commons.lang.util.StringUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AnsjAnalyzer extends Analyzer {
+	public final Logger logger = LoggerFactory.getLogger(getClass());
 
 	/**
 	 * dic equals user , query equals to
@@ -25,7 +30,7 @@ public class AnsjAnalyzer extends Analyzer {
 	 *
 	 */
 	public static enum TYPE {
-		index, query, to, dic, user, search
+		base, index, query, to, dic, user, search
 	}
 
 	/** 自定义停用词 */
@@ -34,10 +39,7 @@ public class AnsjAnalyzer extends Analyzer {
 	private TYPE type;
 
 	/**
-	 * @param filter
-	 *            停用词
-	 * @param pstemming
-	 *            是否分析词干
+	 * @param filter 停用词
 	 */
 	public AnsjAnalyzer(TYPE type, Set<String> filter) {
 		this.type = type;
@@ -52,6 +54,10 @@ public class AnsjAnalyzer extends Analyzer {
 	public AnsjAnalyzer(TYPE type) {
 		this.type = type;
 	}
+	
+	public AnsjAnalyzer(String typeStr) {
+		this.type = TYPE.valueOf(typeStr);
+	}
 
 	private Set<String> filter(String stopwordsDir) {
 		if (StringUtil.isBlank(stopwordsDir)) {
@@ -60,9 +66,10 @@ public class AnsjAnalyzer extends Analyzer {
 		try {
 			List<String> readFile2List = IOUtil.readFile2List(stopwordsDir, IOUtil.UTF8);
 			return new HashSet<String>(readFile2List);
-		} catch (Exception e) {
-			System.err.println("not foun stop word path by " + new File(stopwordsDir).getAbsolutePath());
-			e.printStackTrace();
+		} catch (FileNotFoundException e) {
+			logger.warn("文件没有找到", e);
+		} catch (UnsupportedEncodingException e) {
+			logger.warn("编码不支持", e);
 		}
 		return null;
 	}
@@ -88,6 +95,13 @@ public class AnsjAnalyzer extends Analyzer {
 		Tokenizer tokenizer;
 
 		switch (type) {
+		case base:
+			if (reader == null) {
+				tokenizer = new AnsjTokenizer(new BaseAnalysis(), filter);
+			} else {
+				tokenizer = new AnsjTokenizer(new BaseAnalysis(reader), filter);
+			}
+			break;
 		case index:
 			if (reader == null) {
 				tokenizer = new AnsjTokenizer(new IndexAnalysis(), filter);
